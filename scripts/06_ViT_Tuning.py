@@ -48,7 +48,7 @@ if __name__ == "__main__":
     ######################################### Load the data #########################################
 
     # Load the data from the h5py file
-    h5file = '../../docs/data/Augmented_PepNet_data.h5'
+    h5file = '../data/Augmented_PepNet_data.h5'
 
     with h5py.File(h5file, 'r') as F:
         data = np.array(F['images'])
@@ -164,7 +164,7 @@ if __name__ == "__main__":
     metric_name = "mean_squared_error"
 
     args = TrainingArguments(
-        f"../../Results/Models/ViT_Tuned",
+        f"../results/Models/ViT_Tuned",
         save_strategy="epoch",
         evaluation_strategy="epoch",
         learning_rate=5e-4, 
@@ -196,17 +196,17 @@ if __name__ == "__main__":
     outputs = trainer.predict(test_dataset)
     
     # Save the metrics
-    with open("../../Results/ViT_Tuned_Metrics.txt", "w") as f:
+    with open("../results/ViT_Tuned_Metrics.txt", "w") as f:
         f.write(str(outputs.metrics))
 
     # Save the predictions
     df= pd.DataFrame({"True Values": outputs.label_ids, "Predicted Values": outputs.predictions})
-    df.to_csv("../../Results/ViT_Tuned_Predictions.csv", index=False)
+    df.to_csv("../results/ViT_Tuned_Predictions.csv", index=False)
 
     ######################################### Plot the predictions and true values #########################
 
     # Load the predictions from the CSV file
-    df = pd.read_csv("../../Results/ViT_Tuned_Predictions.csv")
+    df = pd.read_csv("../results/ViT_Tuned_Predictions.csv")
 
     # Extract the predicted and true values
     predicted_values = df["Predicted Values"]
@@ -256,7 +256,7 @@ if __name__ == "__main__":
     ############################# Compute the accuracy within the defined threshold #############################
 
     # Load the predictions from the CSV file
-    df = pd.read_csv("../../Results/ViT_Tuned_Predictions.csv")
+    df = pd.read_csv("../results/ViT_Tuned_Predictions.csv")
 
     # Extract the predicted and true values
     predicted_values = df["Predicted Values"]

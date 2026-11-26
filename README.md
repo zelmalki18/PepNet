@@ -1,221 +1,98 @@
-<!--
-<p align="center">
-  <img src="https://github.com/ziad-elmalki/ai4chem/raw/main/docs/source/logo.png" height="150">
-</p>
--->
-
-<h1 align="center">
-  ai4chem
-</h1>
+<h1 align="center">PepNet</h1>
 
 <p align="center">
-    <a href="https://github.com/ziad-elmalki/ai4chem/actions/workflows/tests.yml">
-        <img alt="Tests" src="https://github.com/ziad-elmalki/ai4chem/actions/workflows/tests.yml/badge.svg" /></a>
-    <a href="https://pypi.org/project/ai4chemistry">
-        <img alt="PyPI" src="https://img.shields.io/pypi/v/ai4chemistry" /></a>
-    <a href="https://pypi.org/project/ai4chemistry">
-        <img alt="PyPI - Python Version" src="https://img.shields.io/pypi/pyversions/ai4chemistry" /></a>
-    <a href="https://github.com/ziad-elmalki/ai4chem/blob/main/LICENSE">
-        <img alt="PyPI - License" src="https://img.shields.io/pypi/l/ai4chemistry" /></a>
-    <a href='https://ai4chemistry.readthedocs.io/en/latest/?badge=latest'>
-        <img src='https://readthedocs.org/projects/ai4chemistry/badge/?version=latest' alt='Documentation Status' /></a>
-    <a href="https://codecov.io/gh/ziad-elmalki/ai4chem/branch/main">
-        <img src="https://codecov.io/gh/ziad-elmalki/ai4chem/branch/main/graph/badge.svg" alt="Codecov status" /></a>  
-    <a href="https://github.com/cthoyt/cookiecutter-python-package">
-        <img alt="Cookiecutter template from @cthoyt" src="https://img.shields.io/badge/Cookiecutter-snekpack-blue" /></a>
-    <a href='https://github.com/psf/black'>
-        <img src='https://img.shields.io/badge/code%20style-black-000000.svg' alt='Code style: black' /></a>
-    <a href="https://github.com/ziad-elmalki/ai4chem/blob/main/.github/CODE_OF_CONDUCT.md">
-        <img src="https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg" alt="Contributor Covenant"/></a>
+  Predicting the membrane permeability of cyclic peptides with a descriptor-based baseline,
+  a custom CNN trained on 2D molecule depictions, and a fine-tuned Vision Transformer.
 </p>
 
+<p align="center">
+    <a href="LICENSE">
+        <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
+</p>
 
+This repository was built for the **AI4Chemistry** course project by Ziad El Malki, Colleen Lonfat,
+and Lennard Reihs. It explores three complementary approaches to predicting cyclic peptide
+permeability from the [CycPeptMPDB](http://cycpeptmpdb.com/) database:
 
-## 💪 Getting Started
+1. **Baseline** — gradient boosting / linear models trained on RDKit molecular descriptors
+   (TPSA, molecular weight, H-bond donors/acceptors, functional group counts, ...).
+2. **PepNet** — a convolutional neural network trained directly on 2D RDKit depictions of
+   the peptides, learning permeability from the rendered structure.
+3. **ViT** — a fine-tuned [`google/vit-base-patch16-224-in21k`](https://huggingface.co/google/vit-base-patch16-224-in21k)
+   Vision Transformer, trained on the same molecule images as PepNet.
 
-> This repo allows for the training of an XGBoost model, Fine-tunign Google's ViT and the training of PepNet, a convolutinal network, for the prediction of cell permeability of cylic peptides
+## Repository structure
 
-
-### Command Line Interface
-
-The ai4chemistry command line tool is automatically installed. It can
-be used from the shell with the `--help` flag to show all subcommands:
-
-```shell
-ai4chemistry --help
+```
+PepNet/
+├── scripts/                 Numbered pipeline scripts, meant to be run in order
+├── notebooks/                Exploratory notebooks (baseline tests, ViT tuning)
+├── data/                     Generated datasets (empty in git, populated by scripts 01-02)
+├── results/                  Metrics, predictions, and plots from our training runs
+│   └── plots/
+├── environment-linux.yml     Conda environment (Linux)
+├── environment-macos.yml     Conda environment (macOS)
+└── CITATION.cff
 ```
 
-> TODO show the most useful thing the CLI does! The CLI will have documentation auto-generated
-> by `sphinx`.
+## Getting started
 
-## 🚀 Installation
-
-<!-- Uncomment this section after your first ``tox -e finish``
-The most recent release can be installed from
-[PyPI](https://pypi.org/project/ai4chemistry/) with:
+### 1. Set up the environment
 
 ```shell
-pip install ai4chemistry
-```
--->
-
-The most recent code and data can be installed directly from GitHub with:
-
-```shell
-pip install git+https://github.com/ziad-elmalki/ai4chem.git
-```
-
-### 1) To download the data:
-On linux:
-```shell
-conda env create pepnet_linux.yml
-```
-On MacOS:
-```shell
-conda env create pepnet_macos.yml
-```
-
-Then:
-```shell
+conda env create -f environment-linux.yml   # or environment-macos.yml on macOS
 conda activate pepnet
-
-python3 01_CycPept_Download.py
-python3 02_CycPept_Cleaning.py
-```
-### 1) To train the Gradient Boosting Regression:
-```shell
-conda activate pepnet
-python3 07_Baseline.py
-```
-### 2) To train the PepNet CNN:
-```shell
-python3 03_PepNet_DataGenerator.py
-python3 04_Data_Augmentor.py
-python3 05_Train_PepNet.py
-```
-### 3) To Fine-tune Google's ViT:
-```shell
-python3 03_PepNet_DataGenerator.py
-python3 04_Data_Augmentor.py
-python3 06_ViT_Tuning.py
-```
-or you can use the notebook 02_ViT_Tuning.ipynb in src/ai4chemistry/Notebooks/
-
-
-
-## 👐 Contributing
-
-Contributions, whether filing an issue, making a pull request, or forking, are appreciated. See
-[CONTRIBUTING.md](https://github.com/ziad-elmalki/ai4chem/blob/master/.github/CONTRIBUTING.md) for more information on getting involved.
-
-## 👋 Attribution
-
-### ⚖️ License
-
-The code in this package is licensed under the MIT License.
-
-<!--
-### 📖 Citation
-
-Citation goes here!
--->
-
-<!--
-### 🎁 Support
-
-This project has been supported by the following organizations (in alphabetical order):
-
-- [Harvard Program in Therapeutic Science - Laboratory of Systems Pharmacology](https://hits.harvard.edu/the-program/laboratory-of-systems-pharmacology/)
-
--->
-
-<!--
-### 💰 Funding
-
-This project has been supported by the following grants:
-
-| Funding Body                                             | Program                                                                                                                       | Grant           |
-|----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|-----------------|
-| DARPA                                                    | [Automating Scientific Knowledge Extraction (ASKE)](https://www.darpa.mil/program/automating-scientific-knowledge-extraction) | HR00111990009   |
--->
-
-### 🍪 Cookiecutter
-
-This package was created with [@audreyfeldroy](https://github.com/audreyfeldroy)'s
-[cookiecutter](https://github.com/cookiecutter/cookiecutter) package using [@cthoyt](https://github.com/cthoyt)'s
-[cookiecutter-snekpack](https://github.com/cthoyt/cookiecutter-snekpack) template.
-
-## 🛠️ For Developers
-
-<details>
-  <summary>See developer instructions</summary>
-
-The final section of the README is for if you want to get involved by making a code contribution.
-
-### Development Installation
-
-To install in development mode, use the following:
-
-```bash
-git clone git+https://github.com/ziad-elmalki/ai4chem.git
-cd ai4chem
-pip install -e .
 ```
 
-### 🥼 Testing
-
-After cloning the repository and installing `tox` with `pip install tox`, the unit tests in the `tests/` folder can be
-run reproducibly with:
+### 2. Download and clean the data
 
 ```shell
-tox
+cd scripts
+python 01_CycPept_Download.py
+python 02_CycPept_Cleaning.py
 ```
 
-Additionally, these tests are automatically re-run with each commit in a
-[GitHub Action](https://github.com/ziad-elmalki/ai4chem/actions?query=workflow%3ATests).
+This downloads `CycPeptMPDB_Peptide_All.csv` and writes a cleaned version to `data/`.
 
-### 📖 Building the Documentation
-
-The documentation can be built locally using the following:
+### 3. Baseline models (gradient boosting, linear models)
 
 ```shell
-git clone git+https://github.com/ziad-elmalki/ai4chem.git
-cd ai4chem
-tox -e docs
-open docs/build/html/index.html
-``` 
-
-The documentation automatically installs the package as well as the `docs`
-extra specified in the [`setup.cfg`](setup.cfg). `sphinx` plugins
-like `texext` can be added there. Additionally, they need to be added to the
-`extensions` list in [`docs/source/conf.py`](docs/source/conf.py).
-
-The documentation can be deployed to [ReadTheDocs](https://readthedocs.io) using 
-[this guide](https://docs.readthedocs.io/en/stable/intro/import-guide.html).
-The [`.readthedocs.yml`](.readthedocs.yml) YAML file contains all the configuration you'll need.
-You can also set up continuous integration on GitHub to check not only that
-Sphinx can build the documentation in an isolated environment (i.e., with ``tox -e docs-test``)
-but also that [ReadTheDocs can build it too](https://docs.readthedocs.io/en/stable/pull-requests.html).
-
-### 📦 Making a Release
-
-After installing the package in development mode and installing
-`tox` with `pip install tox`, the commands for making a new release are contained within the `finish` environment
-in `tox.ini`. Run the following from the shell:
-
-```shell
-tox -e finish
+python 07_Baseline.py
 ```
 
-This script does the following:
+Trains and grid-searches linear/Ridge/Lasso/Random Forest/Gradient Boosting regressors on
+molecular descriptors, and reports MSE/MAE/R² on a held-out test set.
 
-1. Uses [Bump2Version](https://github.com/c4urself/bump2version) to switch the version number in the `setup.cfg`,
-   `src/ai4chemistry/version.py`, and [`docs/source/conf.py`](docs/source/conf.py) to not have the `-dev` suffix
-2. Packages the code in both a tar archive and a wheel using [`build`](https://github.com/pypa/build)
-3. Uploads to PyPI using [`twine`](https://github.com/pypa/twine). Be sure to have a `.pypirc` file
-   configured to avoid the need for manual input at this step
-4. Push to GitHub. You'll need to make a release going with the commit where the version was bumped.
-5. Bump the version to the next patch. If you made big changes and want to bump the version by minor, you can
-   use `tox -e bumpversion -- minor` after.
+### 4. PepNet (CNN on molecule images)
 
-</details>
+```shell
+python 03_PepNet_DataGenerator.py   # renders SMILES to images, stores them in an HDF5 file
+python 04_Data_Augmentor.py         # augments the image dataset
+python 05_Train_PepNet.py           # trains the CNN and saves metrics/predictions to results/
+```
+
+### 5. ViT fine-tuning
+
+```shell
+python 03_PepNet_DataGenerator.py   # if not already run
+python 04_Data_Augmentor.py         # if not already run
+python 06_ViT_Tuning.py
+```
+
+or run interactively with [`notebooks/02_ViT_Tuning.ipynb`](notebooks/02_ViT_Tuning.ipynb).
+
+## Results
+
+Selected metrics from our training runs (see [`results/`](results/) for the full predictions
+and plots):
+
+| Model  | Test MSE | Notes |
+|--------|----------|-------|
+| PepNet (CNN) | 0.540 | 76.2% of predictions within 15% of the true value |
+| ViT (fine-tuned) | 0.515 | |
+
+Training curves and prediction scatter plots are available in [`results/plots/`](results/plots/).
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

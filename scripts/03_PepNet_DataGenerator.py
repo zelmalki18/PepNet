@@ -8,7 +8,7 @@ import h5py
 
 if __name__ == '__main__':
     # Read the cycpepdb_clean as a dataframe
-    df = pd.read_csv('../../docs/data/cycpeptdb_clean.csv')
+    df = pd.read_csv('../data/cycpeptdb_clean.csv')
 
     # Drop rows where permeability is -10
     df = df[df['Permeability'] != -10]
@@ -28,7 +28,7 @@ if __name__ == '__main__':
     IMG_HEIGHT = PepNet_data['Image'][0].size[1]
     
     # Create an h5 file
-    h5file = '../../docs/data/PepNet_data.h5'
+    h5file = '../data/PepNet_data.h5'
 
     with h5py.File(h5file, 'w') as h5f:
         # Create the image dataset

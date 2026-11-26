@@ -16,7 +16,7 @@ data_transforms = transforms.Compose([
 ])
 
 # Path to the HDF5 file
-hdf5_file_path = '../../docs/data/PepNet_data.h5'
+hdf5_file_path = '../data/PepNet_data.h5'
 
 # Open the HDF5 file in read mode
 with h5py.File(hdf5_file_path, 'r') as f:
@@ -47,7 +47,7 @@ for image, label in zip(images, labels):
 
 
 # Save augmented data to a new HDF5 file
-output_hdf5_file = '../../docs/data/Augmented_PepNet_data.h5'
+output_hdf5_file = '../data/Augmented_PepNet_data.h5'
 
 with h5py.File(output_hdf5_file, 'w') as f:
     img_ds = f.create_dataset('images', shape=(len(augmented_images), 300, 300, 3), dtype='uint8')

@@ -1,8 +1,9 @@
-cff-version: 1.0.2
+cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "ai4chem"
+title: "PepNet"
 authors:
   - name: "Ziad El Malki"
-version: 0.0.1-dev
-doi:
-url: "https://github.com/EPFL/ai4chem"
+  - name: "Colleen Lonfat"
+  - name: "Lennard Reihs"
+version: 0.1.0
+url: "https://github.com/zelmalki18/PepNet"

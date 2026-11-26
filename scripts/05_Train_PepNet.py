@@ -1,4 +1,4 @@
-'This script trains a convolutional neural network on the PepNet dataset and saves the best model to a pth file in Results/Models.'
+'This script trains a convolutional neural network on the PepNet dataset and saves the best model to a pth file in results/Models.'
 
 import numpy as np 
 import matplotlib.pyplot as plt
@@ -139,7 +139,7 @@ def test(dataloader, model, loss_fn, best_loss, params):
     if test_loss <= best_loss:
         best_loss = test_loss
         best_params = params
-        torch.save(model.state_dict(), '../../Results/Models/PepNet.pth') 
+        torch.save(model.state_dict(), '../results/Models/PepNet.pth') 
         print(f'Saving model with validation loss {best_loss:.4f}')
         
 
@@ -151,7 +151,7 @@ def test(dataloader, model, loss_fn, best_loss, params):
 if __name__ == "__main__":
     
     # Load the data from the h5py file
-    h5file = '../../docs/data/Augmented_PepNet_data.h5'
+    h5file = '../data/Augmented_PepNet_data.h5'
 
     with h5py.File(h5file, 'r') as F:
         images = np.array(F['images'])
@@ -308,7 +308,7 @@ if __name__ == "__main__":
         plt.ylabel("Loss")
         #plt.ylim(0, 1)
         plt.title("PepNet: Train and Validation Loss as a function of epochs")
-        plt.savefig(f"../../Results/Plots/PepNet_Losses_{params}.png")
+        plt.savefig(f"../results/plots/PepNet_losses_e{nb_epochs}_b{bs}_lr{lr}.png")
 
     print(" Done ! \n Grid search results: ", results_grid_search)
     print("Best hyperparameters: ", best_params)
@@ -316,7 +316,7 @@ if __name__ == "__main__":
     
     # Load the best model
     best_model = cnn_model
-    best_model.load_state_dict(torch.load('../../Results/Models/PepNet.pth')) 
+    best_model.load_state_dict(torch.load('../results/Models/PepNet.pth')) 
 
     # Evaluate the model on the test set
     best_model.eval()
@@ -353,11 +353,11 @@ if __name__ == "__main__":
 
     # Save the predictions to a csv file
     df = pd.DataFrame({"True Values": true_list, "Predicted Values": pred_list})
-    df.to_csv("../../Results/predictions_PepNet.csv", index=False)
+    df.to_csv("../results/predictions_PepNet.csv", index=False)
 
     # Save the accuracy and mse to a text file
-    with open("../../Results/metrics_PepNet.txt", "w") as f:
+    with open("../results/metrics_PepNet.txt", "w") as f:
         f.write(f"Test accuracy: {accuracy:.2f}%\n")
         f.write(f"Mean Squared Error: {mse:.4f}\n")
     
-    print("Predictions saved to Results/predictions_PepNet.csv", "Metrics saved to Results/metrics_PepNet.txt")
+    print("Predictions saved to results/predictions_PepNet.csv", "Metrics saved to results/metrics_PepNet.txt")
