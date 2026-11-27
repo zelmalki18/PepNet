@@ -1,16 +1,19 @@
 "This is a script to fine-tune Google's Vision Transformer model on the PepNet dataset for permeability prediction."
 
 # Importing core scientific libraries
-import numpy as np  
-import pandas as pd  
-import matplotlib.pyplot as plt  
+import numpy as np
+import pandas as pd
+import matplotlib
+matplotlib.use("Agg")  # non-interactive backend: plt.show() would otherwise block
+                       # waiting for a GUI window to be closed when a display is present,
+                       # which hangs an unattended run indefinitely.
+import matplotlib.pyplot as plt
 
 # Importing image processing libraries
 from PIL import Image, ExifTags  
 
 # Importing libraries for working with HDF5 files
-import h5py  
-from IPython.display import display  
+import h5py
 
 # Importing PyTorch libraries for deep learning
 import torch  
@@ -47,42 +50,25 @@ if __name__ == "__main__":
     
     ######################################### Load the data #########################################
 
-    # Load the data from the h5py file
-    h5file = '../data/Augmented_PepNet_data.h5'
+    # Load the pre-split train/val/test data (see 04_Data_Augmentor.py: the split
+    # happens before augmentation so a peptide's augmented copy can never end up
+    # on the opposite side of the split from its original image).
+    def load_h5_as_images(path):
+        with h5py.File(path, 'r') as F:
+            images = np.array(F['images'])
+            images = np.clip(images, 0, 255).astype(np.uint8)
+            labels = np.array(F['permeability'])
+        return [Image.fromarray(img) for img in images], labels
 
-    with h5py.File(h5file, 'r') as F:
-        data = np.array(F['images'])
-        data = np.clip(data, 0, 255).astype(np.uint8)
-        data = [Image.fromarray(img) for img in data]
-
-        labels = np.array(F['permeability'])
+    train_data, train_labels = load_h5_as_images('../data/PepNet_train_augmented.h5')
+    val_data, val_labels = load_h5_as_images('../data/PepNet_val.h5')
+    test_data, test_labels = load_h5_as_images('../data/PepNet_test.h5')
 
     #Verify the data
-    print(labels[0])
-    plt.imshow(data[0])
+    print(train_labels[0])
+    plt.imshow(train_data[0])
     plt.show()
-    print(data[0], labels.shape)
-
-        #Check if we can recontruct the image
-    img_array = np.array(data[0])
-    plt.imshow(img_array)
-
-        # Split sizes
-    train_size = 11000
-    val_size = 2000
-    test_size = 1000
-
-    # Randomly shuffle the data
-    np.random.shuffle(data)
-
-    # Split the data
-    train_data = data[:train_size]
-    val_data = data[train_size:train_size+val_size]
-    test_data = data[train_size+val_size:train_size+val_size+test_size]
-
-    train_labels = labels[:train_size]
-    val_labels = labels[train_size:train_size+val_size]
-    test_labels = labels[train_size+val_size:train_size+val_size+test_size]
+    print(train_data[0], train_labels.shape)
 
     train_dict = {"img": train_data, "label": train_labels}
     val_dict = {"img": val_data, "label": val_labels}
@@ -160,21 +146,28 @@ if __name__ == "__main__":
     # Create model instance
     model = ViTForRegression.from_pretrained('google/vit-base-patch16-224-in21k', num_labels=1) #num_labels=1 to solve the target dimension mismatch with the input
     model.base_model.config
+    # Newer transformers versions pick the loss function by matching the class
+    # name against known head types (e.g. "ForImageClassification"); our
+    # renamed "ViTForRegression" subclass doesn't match anything and silently
+    # falls back to a causal-LM loss. Set it explicitly so num_labels=1 still
+    # dispatches to the regression MSELoss path.
+    model.loss_type = "ForImageClassification"
+    model.config.problem_type = "regression"
 
     metric_name = "mean_squared_error"
 
     args = TrainingArguments(
         f"../results/Models/ViT_Tuned",
         save_strategy="epoch",
-        evaluation_strategy="epoch",
-        learning_rate=5e-4, 
-        per_device_train_batch_size=8, 
-        per_device_eval_batch_size=4, 
-        num_train_epochs=100, 
+        eval_strategy="epoch",
+        save_total_limit=2,  # only keep the best + latest checkpoint (100 epochs * ~1GB each otherwise)
+        learning_rate=5e-4,
+        per_device_train_batch_size=8,
+        per_device_eval_batch_size=4,
+        num_train_epochs=100,
         weight_decay=0.01,
         load_best_model_at_end=True,
         metric_for_best_model=metric_name,
-        logging_dir='logs',
         remove_unused_columns=False,
     )
 
@@ -186,7 +179,7 @@ if __name__ == "__main__":
         eval_dataset=val_dataset,
         data_collator=collate_fn,
         compute_metrics=compute_metrics,
-        tokenizer=processor,
+        processing_class=processor,
     )
 
     ######################################### Train the model #############################################
@@ -199,8 +192,8 @@ if __name__ == "__main__":
     with open("../results/ViT_Tuned_Metrics.txt", "w") as f:
         f.write(str(outputs.metrics))
 
-    # Save the predictions
-    df= pd.DataFrame({"True Values": outputs.label_ids, "Predicted Values": outputs.predictions})
+    # Save the predictions (the regression head outputs shape (N, 1); flatten to (N,))
+    df= pd.DataFrame({"True Values": outputs.label_ids, "Predicted Values": outputs.predictions.reshape(-1)})
     df.to_csv("../results/ViT_Tuned_Predictions.csv", index=False)
 
     ######################################### Plot the predictions and true values #########################
@@ -214,6 +207,7 @@ if __name__ == "__main__":
     index = [i for i in range(len(true_values))]
 
     # Plot the predicted and true values
+    plt.figure()
     plt.scatter(index,true_values, label="True Values", s=10)
     plt.scatter(index,predicted_values, label="Predicted Values", color="red", s=10)
     plt.xlabel("Index")
@@ -221,7 +215,8 @@ if __name__ == "__main__":
     plt.title("ViT: Predicted and True Values")
 
     plt.legend()
-    plt.show()
+    plt.savefig("../results/plots/ViT_results.png")
+    plt.close()
 
     ####################################### Plot training loss #############################################
 
@@ -246,12 +241,14 @@ if __name__ == "__main__":
     selected_points = loss_array[::step_size]
 
     # Plot the training loss
+    plt.figure()
     plt.plot(selected_points)
     #plt.ylim(0, 1)
     plt.xlabel("Epoch")
     plt.ylabel("Training Loss")
     plt.title("ViT: Training Loss vs Epoch")
-    plt.show()
+    plt.savefig("../results/plots/ViT_train_loss.png")
+    plt.close()
 
     ############################# Compute the accuracy within the defined threshold #############################
 

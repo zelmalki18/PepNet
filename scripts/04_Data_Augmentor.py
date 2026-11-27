@@ -1,10 +1,21 @@
-'This script performs data augmentation on the PepNet dataset and saves the augmented data to a new HDF5 file.'
+'''This script splits the PepNet dataset into train/val/test sets *before* applying
+data augmentation, then augments only the training images.
+
+Augmenting first and splitting afterwards (the original approach) leaks information:
+each peptide's original image and its augmented copy carry the same label and are highly
+correlated, so if they land on opposite sides of a random split, the model is effectively
+evaluated on near-duplicates of what it trained on, inflating validation/test performance.
+Splitting by peptide first guarantees a peptide's images (original + augmented) always stay
+together on one side of the split.'''
 
 import h5py
-import torch
-from torchvision import transforms
 import numpy as np
-import matplotlib.pyplot as plt
+from torchvision import transforms
+
+SEED = 69
+TRAIN_FRAC = 0.8
+VAL_FRAC = 0.1
+# The remainder (1 - TRAIN_FRAC - VAL_FRAC) goes to the test split.
 
 # Define the data augmentation transformations
 data_transforms = transforms.Compose([
@@ -20,18 +31,37 @@ hdf5_file_path = '../data/PepNet_data.h5'
 
 # Open the HDF5 file in read mode
 with h5py.File(hdf5_file_path, 'r') as f:
-    images = np.array(f['images'][:])
+    images = np.array(f['images'][:]).astype(np.uint8)
     labels = np.array(f['permeability'][:])
 
-images = images.astype(np.uint8)
+# Split peptides into train/val/test *before* augmenting.
+rng = np.random.default_rng(SEED)
+indices = rng.permutation(len(images))
+
+n_train = int(len(indices) * TRAIN_FRAC)
+n_val = int(len(indices) * VAL_FRAC)
+
+train_idx = indices[:n_train]
+val_idx = indices[n_train:n_train + n_val]
+test_idx = indices[n_train + n_val:]
 
 
-# Create an empty list to store augmented images and labels
+def save_split(path, split_images, split_labels):
+    with h5py.File(path, 'w') as f:
+        f.create_dataset('images', data=np.asarray(split_images, dtype='uint8'))
+        f.create_dataset('permeability', data=np.asarray(split_labels, dtype=float))
+
+
+# Validation and test sets stay unaugmented, so evaluation reflects real, unseen peptides.
+save_split('../data/PepNet_val.h5', images[val_idx], labels[val_idx])
+save_split('../data/PepNet_test.h5', images[test_idx], labels[test_idx])
+
+# Augment only the training split: keep the original image plus one randomly
+# augmented copy for each training peptide.
 augmented_images = []
 augmented_labels = []
 
-# Perform data augmentation on each image
-for image, label in zip(images, labels):
+for image, label in zip(images[train_idx], labels[train_idx]):
     # Append original image and label
     augmented_images.append(image)
     augmented_labels.append(label)
@@ -45,18 +75,12 @@ for image, label in zip(images, labels):
     # Append the label again for the augmented image
     augmented_labels.append(label)
 
+save_split('../data/PepNet_train_augmented.h5', augmented_images, augmented_labels)
 
-# Save augmented data to a new HDF5 file
-output_hdf5_file = '../data/Augmented_PepNet_data.h5'
-
-with h5py.File(output_hdf5_file, 'w') as f:
-    img_ds = f.create_dataset('images', shape=(len(augmented_images), 300, 300, 3), dtype='uint8')
-    # Save the images to the dataset
-    for i in range(len(augmented_images)):
-        img_ds[i] = augmented_images[i]
-
-    perm_ds = f.create_dataset('permeability', shape=(len(augmented_labels),), dtype=float)
-    perm_ds[:] = augmented_labels 
-
-print("Data augmentation completed and saved to", output_hdf5_file)
-
+print(
+    f"Split {len(images)} peptides into "
+    f"{len(train_idx)} train / {len(val_idx)} val / {len(test_idx)} test."
+)
+print("Train split (original + augmented) saved to ../data/PepNet_train_augmented.h5")
+print("Val split (unaugmented) saved to ../data/PepNet_val.h5")
+print("Test split (unaugmented) saved to ../data/PepNet_test.h5")

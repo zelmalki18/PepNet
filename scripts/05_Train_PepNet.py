@@ -9,8 +9,6 @@ from torch import nn
 from torch.utils.data import Dataset, DataLoader
 from torch.optim import Adam
 
-from sklearn.model_selection import train_test_split
-
 from torchvision import transforms
 import h5py
 
@@ -84,6 +82,7 @@ def train(dataloader, model, loss_fn, optimizer):
         X, y = X.to(device), y.to(device)
         # Compute prediction and loss
         pred = model(X)  # Pass the data to the model to execute the model forward
+        pred = pred.squeeze(1)  # match target shape [batch] (otherwise MSE broadcasts to [batch, batch])
         loss = loss_fn(pred, y)
         running_loss += loss.item()
 
@@ -149,56 +148,46 @@ def test(dataloader, model, loss_fn, best_loss, params):
 
 
 if __name__ == "__main__":
-    
-    # Load the data from the h5py file
-    h5file = '../data/Augmented_PepNet_data.h5'
 
-    with h5py.File(h5file, 'r') as F:
-        images = np.array(F['images'])
-        labels = np.array(F['permeability'])
+    # Load the pre-split train/val/test data (see 04_Data_Augmentor.py: the split
+    # happens before augmentation so a peptide's augmented copy can never end up
+    # on the opposite side of the split from its original image).
+    def load_h5(path):
+        """Loads an HDF5 split into normalized (float32, NCHW) tensors."""
+        with h5py.File(path, 'r') as F:
+            images = np.array(F['images'])
+            labels = np.array(F['permeability'])
+        data = torch.from_numpy(images).type(torch.float32).permute(0, 3, 1, 2)
+        labels = torch.from_numpy(labels).type(torch.float32)
+        return data, labels
 
-    # Create numpy arrays for labels and data
-    data = torch.from_numpy(images)
-    labels = torch.from_numpy(labels)
-    print(data.shape, labels.shape)
+    train_data, train_labels = load_h5('../data/PepNet_train_augmented.h5')
+    val_data, val_labels = load_h5('../data/PepNet_val.h5')
+    test_data, test_labels = load_h5('../data/PepNet_test.h5')
 
-    # Change the data type and permute the color channel axis
-    data = data.type(torch.float32).permute(0, 3, 1, 2)  # leave this as is
-    labels = labels.type(torch.float32)  # leave this as is
-    
+    print(train_data.shape, train_labels.shape)
 
-    # Select a subset of images for computing mean and std
-    subset_images = data[:1000]
+    # Select a subset of the *training* images for computing mean and std
+    subset_images = train_data[:1000]
 
-    # Compute mean and std from the entire dataset
+    # Compute mean and std from the training subset only (never from val/test)
     mean = torch.mean(subset_images.float(), dim=(0, 2, 3))
     std = torch.std(subset_images.float(), dim=(0, 2, 3))
 
     print("Computed Mean:", mean)
     print("Computed Std:", std)
 
-    # Define the composed transform 
+    # Define the composed transform
     composed_transform = transforms.Compose([
         transforms.Normalize(mean=mean.tolist(), std=std.tolist())
     ])
 
-    # Apply the transform to the entire dataset
-    Test_Normalization_data = composed_transform(data)
+    # Create the datasets
+    Train_dataset = MyDataset(train_data, train_labels, transform=composed_transform)
+    Val_dataset = MyDataset(val_data, val_labels, transform=composed_transform)
+    Test_dataset = MyDataset(test_data, test_labels, transform=composed_transform)
 
-    # Now, transformed_images contains the normalized images
-    # We check the mean and std of the transformed images
-    print("Transformed Mean:", torch.mean(Test_Normalization_data.float(), dim=(0, 2, 3)))
-    print("Transformed Std:", torch.std(Test_Normalization_data.float(), dim=(0, 2, 3)))
 
-    # Split the data into training and test sets
-    train_idx, test_idx = train_test_split(np.arange(labels.shape[0]), train_size=13000)
-    train_images, train_labels, test_images, test_labels = data[train_idx], labels[train_idx], data[test_idx], labels[test_idx]
-
-    # Create the datasets 
-    Train_dataset = MyDataset(train_images, train_labels, transform=composed_transform)
-    Test_dataset = MyDataset(test_images, test_labels, transform=composed_transform)
-
-    
     # Define hyperparameters for the tuning 
     hyperparameters = [
         
@@ -220,51 +209,56 @@ if __name__ == "__main__":
         {'epochs': 100, 'batch_size': 32, 'learning_rate': 1e-3},
     ]
 
-    # Define the model architecture 
-    cnn_model = nn.Sequential(
-    nn.Conv2d(3, 32, kernel_size=3, padding=1),  
-    nn.BatchNorm2d(32),
-    nn.ReLU(),
-    nn.MaxPool2d(2, 2),                         
+    # Define the model architecture as a factory, so each hyperparameter config
+    # below trains its own freshly-initialized model. Building a single
+    # `cnn_model` here and reusing it across configs would make this loop
+    # continue training one model across configs instead of comparing them.
+    def build_model():
+        return nn.Sequential(
+        nn.Conv2d(3, 32, kernel_size=3, padding=1),
+        nn.BatchNorm2d(32),
+        nn.ReLU(),
+        nn.MaxPool2d(2, 2),
 
-    nn.Conv2d(32, 64, kernel_size=3, padding=1), 
-    nn.BatchNorm2d(64),
-    nn.ReLU(),
-    nn.MaxPool2d(2, 2),                         
+        nn.Conv2d(32, 64, kernel_size=3, padding=1),
+        nn.BatchNorm2d(64),
+        nn.ReLU(),
+        nn.MaxPool2d(2, 2),
 
-    nn.Conv2d(64, 128, kernel_size=3, padding=1),
-    nn.BatchNorm2d(128),
-    nn.ReLU(),
-    nn.MaxPool2d(2, 2),                         
+        nn.Conv2d(64, 128, kernel_size=3, padding=1),
+        nn.BatchNorm2d(128),
+        nn.ReLU(),
+        nn.MaxPool2d(2, 2),
 
-    nn.Conv2d(128, 256, kernel_size=3, padding=1),
-    nn.BatchNorm2d(256),
-    nn.ReLU(),
-    nn.MaxPool2d(2, 2),                         
+        nn.Conv2d(128, 256, kernel_size=3, padding=1),
+        nn.BatchNorm2d(256),
+        nn.ReLU(),
+        nn.MaxPool2d(2, 2),
 
-    nn.Flatten(),                               
+        nn.Flatten(),
 
-    nn.Linear(256*18*18, 512),
-    nn.BatchNorm1d(512),
-    nn.ReLU(),
-    nn.Dropout(0.5),
+        nn.Linear(256*18*18, 512),
+        nn.BatchNorm1d(512),
+        nn.ReLU(),
+        nn.Dropout(0.5),
 
-    nn.Linear(512, 256),
-    nn.BatchNorm1d(256),
-    nn.ReLU(),
-    nn.Dropout(0.5),
+        nn.Linear(512, 256),
+        nn.BatchNorm1d(256),
+        nn.ReLU(),
+        nn.Dropout(0.5),
 
-    nn.Linear(256, 84),
-    nn.BatchNorm1d(84),
-    nn.ReLU(),
-    nn.Dropout(0.5),
+        nn.Linear(256, 84),
+        nn.BatchNorm1d(84),
+        nn.ReLU(),
+        nn.Dropout(0.5),
 
-    nn.Linear(84, 1)    # Single output for regression
-    ).to(device)
+        nn.Linear(84, 1)    # Single output for regression
+        ).to(device)
 
 
     loss_fn = nn.MSELoss()
     best_loss = float('inf')
+    best_params = None
     results_grid_search = []
     for params in hyperparameters:
 
@@ -272,28 +266,33 @@ if __name__ == "__main__":
         bs = params['batch_size']
         lr = params['learning_rate']
 
+        cnn_model = build_model()
+
         print(f"Training with params: epochs={nb_epochs}, batch_size={bs}, learning_rate={lr}")
 
         optimizer_full_cnn = torch.optim.Adam(cnn_model.parameters(), lr) # Pass model parameters to optimizer
         
         train_dataloader = DataLoader(Train_dataset, batch_size=bs, shuffle=True)
-        test_dataloader = DataLoader(Test_dataset, batch_size=bs)
+        val_dataloader = DataLoader(Val_dataset, batch_size=bs)
 
         # Train the model
         Losses_train_convo = []
         Losses_val_convo = []
-        
+
         for t in range(nb_epochs):
             print(f"Epoch {t+1}\n")
 
             train_loss = train(train_dataloader, cnn_model, loss_fn, optimizer_full_cnn)
             Losses_train_convo.append(train_loss)
             print(f"Training Error: \n Avg loss: {train_loss:>8f} \n")
-            val_loss, best_loss, best_params = test(test_dataloader, cnn_model, loss_fn, best_loss, params)
+            # `test()` only returns non-None params when this epoch improved on
+            # best_loss; only overwrite best_params in that case, otherwise a
+            # later non-improving epoch clobbers it back to None.
+            val_loss, best_loss, candidate_params = test(val_dataloader, cnn_model, loss_fn, best_loss, params)
             Losses_val_convo.append(val_loss)
-            #params = best_params
-            best_loss = best_loss
-            
+            if candidate_params is not None:
+                best_params = candidate_params
+
         results_grid_search.append({
             'params': params,
             'best_loss': best_loss
@@ -314,11 +313,13 @@ if __name__ == "__main__":
     print("Best hyperparameters: ", best_params)
     
     
-    # Load the best model
+    # Load the best model (selected by validation loss)
     best_model = cnn_model
-    best_model.load_state_dict(torch.load('../results/Models/PepNet.pth')) 
+    best_model.load_state_dict(torch.load('../results/Models/PepNet.pth'))
 
-    # Evaluate the model on the test set
+    # Final evaluation on the held-out test set, never used for model/hyperparameter selection
+    test_dataloader = DataLoader(Test_dataset, batch_size=best_params['batch_size'])
+
     best_model.eval()
     true_list = []
     pred_list = []

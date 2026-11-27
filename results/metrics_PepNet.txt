@@ -1,2 +1,2 @@
-Test accuracy: 76.19%
-Mean Squared Error: 0.5399
+Test accuracy: 84.22%
+Mean Squared Error: 0.4566
